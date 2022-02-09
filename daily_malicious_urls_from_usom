@@ -14,6 +14,13 @@ def write_all_urls_to_json_file(malicious_urls):
     with open('usom_list.json','w') as usom_json_w:
         json.dump(malicious_urls, usom_json_w)
 
+def write_daily_urls_to_txt_file(malicious_urls):
+    counter_while = 0
+    while current_date() == current_url_date(malicious_urls, counter_while):
+        with open('usom_list-%s.txt'%(current_date()), "a") as text_file:
+            text_file.write( str(malicious_urls["usom-data"]["url-list"]["url-info"][counter_while]) + "\n")
+        counter_while = counter_while + 1
+
 def get_usom_malicious_urls():
     usom_url = 'https://www.usom.gov.tr/url-list.xml'
     try:
@@ -26,13 +33,6 @@ def get_usom_malicious_urls():
     else:
         print(F"Couldn't get content. Status Code: %"%(response.status_code))
         return False
-
-def write_daily_urls_to_txt_file(malicious_urls):
-    counter_while = 0
-    while current_date() == current_url_date(malicious_urls, counter_while):
-        with open('usom_list-%s.txt'%(current_date()), "a") as text_file:
-            text_file.write( str(malicious_urls["usom-data"]["url-list"]["url-info"][counter_while]) + "\n")
-        counter_while = counter_while + 1
 
 malicious_urls = get_usom_malicious_urls()
 if malicious_urls != False:
