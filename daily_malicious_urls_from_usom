@@ -1,0 +1,42 @@
+import datetime
+import requests
+import xmltodict, json
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def current_date():
+    return (str(datetime.datetime.now()).split(' '))[0]
+
+def current_url_date(current_url_date_info,counter):
+    return ((current_url_date_info["usom-data"]["url-list"]["url-info"][counter]["date"]).split(' '))[0]
+
+def write_all_urls_to_json_file(malicious_urls):
+    with open('usom_list.json','w') as usom_json_w:
+        json.dump(malicious_urls, usom_json_w)
+
+def get_usom_malicious_urls():
+    usom_url = 'https://www.usom.gov.tr/url-list.xml'
+    try:
+        response = requests.get(usom_url,verify=False)
+    except:
+        print("Problem occured. No response was received.")
+        return False
+    if response.status_code == 200:
+        return xmltodict.parse(response.content)
+    else:
+        print(F"Couldn't get content. Status Code: %"%(response.status_code))
+        return False
+
+def write_daily_urls_to_txt_file(malicious_urls):
+    counter_while = 0
+    while current_date() == current_url_date(malicious_urls, counter_while):
+        with open('usom_list-%s.txt'%(current_date()), "a") as text_file:
+            text_file.write( str(malicious_urls["usom-data"]["url-list"]["url-info"][counter_while]) + "\n")
+        counter_while = counter_while + 1
+
+malicious_urls = get_usom_malicious_urls()
+if malicious_urls != False:
+    write_all_urls_to_json_file(malicious_urls)
+    write_daily_urls_to_txt_file(malicious_urls)
+else:
+    print("Program Stopped.")
