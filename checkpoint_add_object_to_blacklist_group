@@ -1,0 +1,143 @@
+import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def request(url, data, header):
+    return requests.post(url=url, json=data, headers=header, verify=False)
+
+def login(mgmt_url):
+    data = {
+        "user": "admin",
+        "password": "1qaz2wsx"
+    }
+    header = {}
+    login_req = request(mgmt_url+"login", data, header)
+    print("Publish request status code: " + str(login_req.status_code))
+    print("Session id: " + str(login_req.json()["sid"]))
+    return login_req.json()["sid"]
+
+def publish(session_id):
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Publish request status code: " + str(request(mgmt_url + "publish", data, header).status_code))
+
+def discard(session_id):
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Discard request status code: " + str(request(mgmt_url + "discard", data, header).status_code))
+
+def logout(session_id):
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Logout request status code: " + str(request(mgmt_url + "logout", data, header).status_code))
+
+def checking_existence(session_id, list, req, description1, description2):
+    exist = []
+    non_exist = []
+    for counter in range(0,len(list)):
+        data = {
+            "name": list[counter][0]
+        }
+        header = {
+            "Content-Type": "application/json",
+            "X-chkp-sid": session_id
+        }
+        checking_req = request(mgmt_url + req, data, header)
+        if checking_req.status_code == 200:
+            exist.append(list[counter])
+        else:
+            non_exist.append(list[counter])
+    print(description1 +str(exist))
+    print(description2 +str(non_exist))
+    return exist, non_exist
+
+def add_nonexist(non_exist, data, req, description1, description2):
+    successful_added = []
+    unsuccessful_added = []
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    add_req = request(mgmt_url + req, data, header)
+    if add_req.status_code == 200:
+        successful_added.append(non_exist[counter])
+    else:
+        unsuccessful_added.append(non_exist[counter])
+    print(description1 + str(successful_added))
+    print(description2 + str(unsuccessful_added))
+    return successful_added, unsuccessful_added
+
+def add_object_to_blacklist(session_id, total_list, req, description1, description2):
+    added_objects = []
+    non_added_objects = []
+    for counter in range(0, len(total_list)):
+        data = {
+            "name" : "blacklist",
+            "members" : {
+                "add" : total_list[counter][0]
+            }
+        }
+        header = {
+            "Content-Type": "application/json",
+            "X-chkp-sid": session_id
+        }
+        checking_req = request(mgmt_url + req, data, header)
+        if checking_req.status_code == 200:
+            added_objects.append(total_list[counter])
+        else:
+            non_added_objects.append(total_list[counter])
+    print(description1 + str(added_objects))
+    print(description2 + str(non_added_objects))
+    return added_objects, non_added_objects
+
+# main program
+total_list = []
+successful_added_hosts = []
+successful_added_networks = []
+successful_added_ranges = []
+mgmt_url = "https://192.168.1.200/web_api/"
+# host list includes name and ipv4-address
+host_list = [["asite_4.4.4.4","4.4.4.4"], ["bsite_1.1.1.1","1.1.1.1"],["dsite_10.10.10.10","10.10.10.10"]]
+# network list includes name, subnet and subnet-mask
+network_list = [["net_10.10.10.0/16","1.1.1.0","255.255.0.0"],["net_20.20.20.0/25","20.20.20.0","255.255.255.128"]]
+# range list includes name, first ipv4-address and last ipv4-address
+range_list = [["range_2.2.2.64-100","2.2.2.64","2.2.2.100"],["range_30.20.20.64-100","30.20.20.64","30.20.20.100"]]
+
+try:
+    session_id = login(mgmt_url)
+    exist_hosts, non_exist_hosts = checking_existence(session_id, host_list, "show-host", "Exist Hosts: ", "nonExist Hosts: ")
+    exist_networks, non_exist_networks = checking_existence(session_id, network_list, "show-network", "Exist Networks: ", "nonExist Networks: ")
+    exist_ranges, non_exist_ranges = checking_existence(session_id, range_list, "show-address-range", "Exist Ranges: ", "nonExist Ranges: ")
+    
+    for counter in range(0,len(non_exist_hosts)):
+        data = {"name": non_exist_hosts[counter][0], "ip-address": non_exist_hosts[counter][1],
+                "ignore-warnings": True}
+        successful_added_hosts, unsuccessful_added_hosts = add_nonexist(non_exist_hosts, data, "add-host", "Successful Added Hosts: ", "Unsuccessful Added Hosts: ")
+    
+    for counter in range(0, len(non_exist_networks)):
+        data = {"name": non_exist_networks[counter][0], "subnet4": non_exist_networks[counter][1],
+                "subnet-mask": non_exist_networks[counter][2], "ignore-warnings": True}
+        successful_added_networks, unsuccessful_added_networks = add_nonexist(non_exist_networks, data, "add-network", "Successful Added Networks: ", "Unsuccessful Added Networks: ")
+    
+    for counter in range(0, len(non_exist_ranges)):
+        data = {"name": non_exist_ranges[counter][0], "ip-address-first": non_exist_ranges[counter][1],
+                "ip-address-last": non_exist_ranges[counter][2], "ignore-warnings": True}
+        successful_added_ranges, unsuccessful_added_ranges = add_nonexist(non_exist_ranges, data, "add-address-range", "Successful Added Ranges: ", "Unsuccessful Added Ranges: ")
+    
+    total_list = exist_hosts + exist_networks + exist_ranges +successful_added_hosts + successful_added_networks + successful_added_ranges
+    added_objects, non_added_objects = add_object_to_blacklist(session_id, total_list ,"set-group", "Added Objects to Group: ", "Non Added Objects to Group: ")
+    publish(session_id)
+    logout(session_id)
+except:
+    discard(session_id)
+    logout(session_id)
+    print("Problem occurred. Changes discarded.")
