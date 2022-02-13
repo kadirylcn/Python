@@ -1,0 +1,214 @@
+import requests
+import ipaddress
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def login(mgmt_url):
+    ''' Login device and create Session ID'''
+    data = {
+        "user": "admin",
+        "password": "1qaz2wsx"
+    }
+    header = {}
+    login_req = requests.post(url=mgmt_url+"login", json=data, headers=header, verify=False)
+    print("Login request status code: " + str(login_req.status_code))
+    print("Session id: " + str(login_req.json()["sid"]))
+    return login_req.json()["sid"]
+
+def publish(session_id):
+    ''' Publish changes to the device'''
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Publish request status code: " + str(requests.post(url=mgmt_url+"publish", json=data, headers=header, verify=False).status_code))
+
+def discard(session_id):
+    ''' Discard changes '''
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Discard request status code: " + str(requests.post(url=mgmt_url+"discard", json=data, headers=header, verify=False).status_code))
+
+def logout(session_id):
+    ''' Logout from session'''
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Logout request status code: " + str(requests.post(url=mgmt_url+"logout", json=data, headers=header, verify=False).status_code))
+
+def get_objects(session_id, req):
+    ''' get all network-range objects information from management '''
+    data = {
+        "limit" : 500,
+        "offset" : 0,
+        "details-level" : "standard"
+    }
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    return requests.post(url=mgmt_url + req, json=data, headers=header, verify=False).json()
+
+def checking_host(host_list, host_objects):
+    ''' if host exist, keep it in new created list '''
+    list = []
+    for counter_host in range(0, len(host_list)):
+        for counter in range(0, len(host_objects["objects"])):
+            keep_list = []
+            if host_list[counter_host] == host_objects["objects"][counter]["ipv4-address"]:
+                keep_list.append(host_objects["objects"][counter]["uid"])
+                keep_list.append(host_objects["objects"][counter]["name"])
+                keep_list.append(host_objects["objects"][counter]["ipv4-address"])
+                list.append(keep_list)
+    return list
+
+def checking_host_in_network(host_list, network_objects):
+    ''' if network contains the host, keep network in new created list '''
+    list = []
+    for counter_host in range(0, len(host_list)):
+        for counter in range(0,len(network_objects["objects"])):
+            keep_list = []
+            host = ipaddress.ip_address(host_list[counter_host])
+            try:
+                network = ipaddress.ip_network(str(network_objects["objects"][counter]["subnet4"])+"/"+str(network_objects["objects"][counter]["mask-length4"]))
+            except:
+                continue
+            if (host in network) == True:
+                keep_list.append(network_objects["objects"][counter]["uid"])
+                keep_list.append(network_objects["objects"][counter]["name"])
+                keep_list.append(network_objects["objects"][counter]["subnet4"])
+                keep_list.append(network_objects["objects"][counter]["subnet-mask"])
+                list.append(keep_list)
+    return list
+
+def checking_host_in_range(host_list, range_objects):
+    ''' if address-range contains the host, keep range in new created list '''
+    list = []
+    for counter_host in range(0, len(host_list)):
+        splitted_host = host_list[counter_host].split(".")
+        for counter_range in range(0, len(range_objects["objects"])):
+            keep_list = []
+            splitted_range_first_address = range_objects["objects"][counter_range]["ipv4-address-first"].split(".")
+            splitted_range_last_address = range_objects["objects"][counter_range]["ipv4-address-last"].split(".")
+            if (splitted_host[0] == splitted_range_first_address[0]) and \
+                    (splitted_host[1] == splitted_range_first_address[1]) and \
+                    (splitted_host[2] == splitted_range_first_address[2]) and \
+                    (splitted_host[0] == splitted_range_last_address[0]) and \
+                    (splitted_host[1] == splitted_range_last_address[1]) and \
+                    (splitted_host[2] == splitted_range_last_address[2]) and \
+                    (int(splitted_host[3]) <= int(splitted_range_last_address[3]) and int(splitted_host[3]) >= int(splitted_range_first_address[3])):
+                keep_list.append(range_objects["objects"][counter_range]["uid"])
+                keep_list.append(range_objects["objects"][counter_range]["name"])
+                keep_list.append(range_objects["objects"][counter_range]["ipv4-address-first"])
+                keep_list.append(range_objects["objects"][counter_range]["ipv4-address-last"])
+                list.append(keep_list)
+    return list
+
+def checking_group(uid_list_host_network_range, req):
+    ''' if group object contains the host, keep group object uid in list which have host-network-range uids '''
+    group_uid = []
+    for counter in range(0,len(uid_list_host_network_range)):
+        data = {
+            "uid": uid_list_host_network_range[counter],
+        }
+        header = {
+            "Content-Type": "application/json",
+            "X-chkp-sid": session_id
+        }
+        where_used_req = requests.post(url=mgmt_url + req, json=data, headers=header, verify=False).json()
+        if where_used_req["used-directly"]["objects"] != []:
+            for counter_where in range(0, len(where_used_req["used-directly"]["objects"])):
+                if where_used_req["used-directly"]["objects"][counter_where]["type"] == "group":
+                    if group_uid.count(where_used_req["used-directly"]["objects"][counter_where]["uid"]) == 0:
+                        group_uid.append(where_used_req["used-directly"]["objects"][counter_where]["uid"])
+    total_uid = uid_list_host_network_range + group_uid
+    return total_uid
+
+def get_access_rulebase(session_id, req):
+    ''' get access rulebase from management '''
+    data = {
+        "limit": 500,
+        "offset": 0,
+        "name" : "Network",
+        "details-level" : "standard",
+        "use-object-dictionary" : False
+    }
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    return requests.post(url=mgmt_url + req, json=data, headers=header, verify=False).json()
+
+def get_services_from_access_rulebase(access_rulebase, uid_list):
+    ''' get services from rules which contains specific uids in thier sources and destinations  '''
+    tcp_service_list = []
+    udp_service_list = []
+    for counter_rule in range(0,len(access_rulebase["rulebase"])):
+        if (len(access_rulebase["rulebase"][counter_rule]["source"]) != 0) and (
+                access_rulebase["rulebase"][counter_rule]["action"]["name"] == "Accept"):
+            for counter_source in range(0, len(access_rulebase["rulebase"][counter_rule]["source"])):
+                for counter_uid in range(0, len(uid_list)):
+                    if (access_rulebase["rulebase"][counter_rule]["source"][counter_source]["uid"] == uid_list[counter_uid]):
+                        for counter_service in range(0, len(access_rulebase["rulebase"][counter_rule]["service"])):
+                            if access_rulebase["rulebase"][counter_rule]["service"][counter_service]["type"] == "service-tcp":
+                                if tcp_service_list.count(access_rulebase["rulebase"][counter_rule]["service"][counter_service]["port"]) == 0:
+                                    tcp_service_list.append(access_rulebase["rulebase"][counter_rule]["service"][counter_service]["port"])
+                            if access_rulebase["rulebase"][counter_rule]["service"][counter_service]["type"] == "service-udp":
+                                if udp_service_list.count(access_rulebase["rulebase"][counter_rule]["service"][counter_service]["port"]) == 0:
+                                    udp_service_list.append(access_rulebase["rulebase"][counter_rule]["service"][counter_service]["port"])
+        if (len(access_rulebase["rulebase"][counter_rule]["destination"]) != 0) and (
+                access_rulebase["rulebase"][counter_rule]["action"]["name"] == "Accept"):
+            for counter_destination in range(0, len(access_rulebase["rulebase"][counter_rule]["destination"])):
+                for counter_uid in range(0, len(uid_list)):
+                    if (access_rulebase["rulebase"][counter_rule]["destination"][counter_destination]["uid"] == uid_list[counter_uid]):
+                        for counter_service in range(0, len(access_rulebase["rulebase"][counter_rule]["service"])):
+                            if access_rulebase["rulebase"][counter_rule]["service"][counter_service]["type"] == "service-tcp":
+                                if tcp_service_list.count(access_rulebase["rulebase"][counter_rule]["service"][counter_service]["port"]) == 0:
+                                    tcp_service_list.append(access_rulebase["rulebase"][counter_rule]["service"][counter_service]["port"])
+                            if access_rulebase["rulebase"][counter_rule]["service"][counter_service]["type"] == "service-udp":
+                                if udp_service_list.count(access_rulebase["rulebase"][counter_rule]["service"][counter_service]["port"]) == 0:
+                                    udp_service_list.append(access_rulebase["rulebase"][counter_rule]["service"][counter_service]["port"])
+    return tcp_service_list, udp_service_list
+
+def uid_list_host_network_range(checking_host_list, networks_contain_host_list, ranges_contain_host_list):
+    ''' add host,network and range uids in the same list '''
+    uid_list = []
+    for counter in range(0,len(checking_host_list)):
+        uid_list.append(checking_host_list[counter][0])
+    for counter in range(0,len(networks_contain_host_list)):
+        uid_list.append(networks_contain_host_list[counter][0])
+    for counter in range(0,len(ranges_contain_host_list)):
+        uid_list.append(networks_contain_host_list[counter][0])
+    return uid_list
+
+''' main program '''
+mgmt_url = "https://192.168.1.200/web_api/"
+''' host list includes ipv4-address info '''
+host_list = ["2.2.2.2"]
+try:
+    session_id = login(mgmt_url)
+    host_objects_from_mgmt = get_objects(session_id, "show-hosts")
+    network_objects_from_mgmt = get_objects(session_id, "show-networks")
+    range_objects_from_mgmt = get_objects(session_id, "show-address-ranges")
+    checking_host_list = checking_host(host_list, host_objects_from_mgmt)
+    networks_contain_host_list = checking_host_in_network(host_list, network_objects_from_mgmt)
+    ranges_contain_host_list = checking_host_in_range(host_list, range_objects_from_mgmt)
+    uid_list_host_network_range = uid_list_host_network_range(checking_host_list, networks_contain_host_list, ranges_contain_host_list)
+    uid_list = checking_group(uid_list_host_network_range, "where-used")
+    access_rulebase = get_access_rulebase(session_id, "show-access-rulebase")
+    tcp_service_list, udp_service_list = get_services_from_access_rulebase(access_rulebase, uid_list)
+    print("Host IP List: " + str(host_list))
+    print("TCP services : " +str(tcp_service_list))
+    print("UDP services : " + str(udp_service_list))
+    publish(session_id)
+    logout(session_id)
+except:
+    discard(session_id)
+    logout(session_id)
+    print("Problem occurred. Changes discarded.")
