@@ -189,7 +189,7 @@ def uid_list_host_network_range(checking_host_list, networks_contain_host_list, 
 
 ''' main program '''
 mgmt_url = "https://192.168.1.200/web_api/"
-''' host list includes ipv4-address info '''
+''' host list should include only ipv4-address '''
 host_list = ["2.2.2.2"]
 try:
     session_id = login(mgmt_url)
