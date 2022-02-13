@@ -184,7 +184,7 @@ def uid_list_host_network_range(checking_host_list, networks_contain_host_list, 
     for counter in range(0,len(networks_contain_host_list)):
         uid_list.append(networks_contain_host_list[counter][0])
     for counter in range(0,len(ranges_contain_host_list)):
-        uid_list.append(networks_contain_host_list[counter][0])
+        uid_list.append(ranges_contain_host_list[counter][0])
     return uid_list
 
 ''' main program '''
