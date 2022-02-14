@@ -3,6 +3,7 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def login(mgmt_url):
+    ''' Login device and create Session ID'''
     data = {
         "user": "admin",
         "password": "1qaz2wsx"
@@ -14,6 +15,7 @@ def login(mgmt_url):
     return login_req.json()["sid"]
 
 def publish(session_id):
+    ''' Publish changes to the device'''
     data = {}
     header = {
         "Content-Type": "application/json",
@@ -22,6 +24,7 @@ def publish(session_id):
     print("Publish request status code: " + str(requests.post(url=mgmt_url+"publish", json=data, headers=header, verify=False).status_code))
 
 def discard(session_id):
+    ''' Discard changes '''
     data = {}
     header = {
         "Content-Type": "application/json",
@@ -30,6 +33,7 @@ def discard(session_id):
     print("Discard request status code: " + str(requests.post(url=mgmt_url+"discard", json=data, headers=header, verify=False).status_code))
 
 def logout(session_id):
+    ''' Logout from session'''
     data = {}
     header = {
         "Content-Type": "application/json",
@@ -76,6 +80,7 @@ def add_nonexist(non_exist, data, req, description1, description2):
     return successful_added, unsuccessful_added
 
 def add_object_to_blacklist(session_id, total_list, req, description1, description2):
+    ''' add objects to blacklist '''
     added_objects = []
     non_added_objects = []
     for counter in range(0, len(total_list)):
