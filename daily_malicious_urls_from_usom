@@ -4,26 +4,23 @@ import xmltodict, json
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-def current_date():
-    return (str(datetime.datetime.now()).split(' '))[0]
-
-def current_url_date(current_url_date_info,counter):
-    return ((current_url_date_info["usom-data"]["url-list"]["url-info"][counter]["date"]).split(' '))[0]
-
 def write_all_urls_to_json_file(malicious_urls):
+    ''' create json file and put in all usom urls '''
     with open('usom_list.json','w') as usom_json_w:
         json.dump(malicious_urls, usom_json_w)
 
 def write_daily_urls_to_txt_file(malicious_urls):
+    ''' create txt file and put in urls which only contains current date '''
     counter_url = 0
-    while current_date() == current_url_date(malicious_urls, counter_url):
-        with open('usom_list-%s.txt'%(current_date()), "a") as text_file:
+    while (str(datetime.datetime.now()).split(' '))[0] == ((malicious_urls["usom-data"]["url-list"]["url-info"][counter_url]["date"]).split(' '))[0]:
+        with open('usom_list-%s.txt'%(str(datetime.datetime.now()).split(' ')[0]), "a") as text_file:
             text_file.write( str(malicious_urls["usom-data"]["url-list"]["url-info"][counter_url]) + "\n")
         counter_url = counter_url + 1
 
 def get_usom_malicious_urls():
+    ''' request to USOM for get file which contains malicious urls '''
     usom_url = 'https://www.usom.gov.tr/url-list.xml'
-    # after the request the program continues even if it receives an error.
+    ''' after the request the program continues even if it receives an error. '''
     try:
         response = requests.get(usom_url,verify=False)
     except:
@@ -35,7 +32,7 @@ def get_usom_malicious_urls():
         print(F"Couldn't get content. Status Code: %"%(response.status_code))
         return False
 
-# main program
+''' main program '''
 malicious_urls = get_usom_malicious_urls()
 if malicious_urls != False:
     write_all_urls_to_json_file(malicious_urls)
