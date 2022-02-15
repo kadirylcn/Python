@@ -1,0 +1,189 @@
+import requests
+import ipaddress
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def login(mgmt_url):
+    ''' Login device and create Session ID'''
+    data = {
+        "user": "admin",
+        "password": "1qaz2wsx"
+    }
+    header = {}
+    login_req = requests.post(url=mgmt_url+"login", json=data, headers=header, verify=False)
+    print("Login request status code: " + str(login_req.status_code))
+    print("Session id: " + str(login_req.json()["sid"]))
+    return login_req.json()["sid"]
+
+def publish(session_id):
+    ''' Publish changes to the device'''
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Publish request status code: " + str(requests.post(url=mgmt_url+"publish", json=data, headers=header, verify=False).status_code))
+
+def discard(session_id):
+    ''' Discard changes '''
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Discard request status code: " + str(requests.post(url=mgmt_url+"discard", json=data, headers=header, verify=False).status_code))
+
+def logout(session_id):
+    ''' Logout from session'''
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Logout request status code: " + str(requests.post(url=mgmt_url+"logout", json=data, headers=header, verify=False).status_code))
+
+def get_objects(session_id, req):
+    ''' get all host-network-range objects information from management '''
+    data = {
+        "limit" : 500,
+        "offset" : 0,
+        "details-level" : "standard"
+    }
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    return requests.post(url=mgmt_url + req, json=data, headers=header, verify=False).json()
+
+def set_object(session_id, data, req, mgmt_url):
+    ''' set object on management, if get "More than one object named" error, func will return "dublicate" value. '''
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    req_set = requests.post(url=mgmt_url + req, json=data, headers=header, verify=False)
+    print(req_set.status_code)
+    print(req_set.content)
+    print(str(req_set.content).count("More than one object named"))
+    if str(req_set.content).count("More than one object named") == 1:
+        return "dublicate"
+    else:
+        return "unique"
+
+def rename_host_objects(session_id, host_objects_from_mgmt, excluded_objects_uid, mgmt_url):
+    ''' set host according to standard which you made '''
+    for counter_host in range(0, len(host_objects_from_mgmt["objects"])):
+            if host_objects_from_mgmt["objects"][counter_host]["uid"] in excluded_objects_uid:
+                continue
+            else:
+                set_object_result = ""
+                counter_dublicate = 1
+                while set_object_result != "unique":
+                    try:
+                        check_version = host_objects_from_mgmt["objects"][counter_host]["ipv4-address"]
+                    except:
+                        print("IPv6 not supported")
+                        break
+                    data = {
+                        "uid": host_objects_from_mgmt["objects"][counter_host]["uid"],
+                        "new-name": "host_" + str(host_objects_from_mgmt["objects"][counter_host]["ipv4-address"]),
+                        "comments": host_objects_from_mgmt["objects"][counter_host]["name"]
+                    }
+                    set_object_result = set_object(session_id, data, "set-host", mgmt_url)
+                    if set_object_result == "unique":
+                        continue
+                    elif set_object_result == "dublicate":
+                        data_dub = {
+                            "uid": host_objects_from_mgmt["objects"][counter_host]["uid"],
+                            "new-name": f"dub%s_host_"%(str(counter_dublicate)) + str(host_objects_from_mgmt["objects"][counter_host]["ipv4-address"]),
+                            "comments": host_objects_from_mgmt["objects"][counter_host]["name"]
+                        }
+                        set_object_result = set_object(session_id, data_dub, "set-host", mgmt_url)
+                    counter_dublicate = counter_dublicate + 1
+
+def rename_network_objects(session_id, network_objects_from_mgmt, excluded_objects_uid, mgmt_url):
+    ''' set network according to standard which you made '''
+    for counter_network in range(0, len(network_objects_from_mgmt["objects"])):
+        if network_objects_from_mgmt["objects"][counter_network]["uid"] in excluded_objects_uid:
+            continue
+        else:
+            set_object_result = ""
+            counter_dublicate = 1
+            while set_object_result != "unique":
+                try:
+                    check_version = network_objects_from_mgmt["objects"][counter_network]["subnet4"]
+                except:
+                    print("IPv6 not supported")
+                    break
+                data = {
+                    "uid": network_objects_from_mgmt["objects"][counter_network]["uid"],
+                    "new-name": "net_"+str(network_objects_from_mgmt["objects"][counter_network]["subnet4"])+"/"+str(network_objects_from_mgmt["objects"][counter_network]["mask-length4"]),
+                    "comments": network_objects_from_mgmt["objects"][counter_network]["name"]
+                }
+                set_object_result = set_object(session_id, data, "set-network", mgmt_url)
+                if set_object_result == "unique":
+                    continue
+                elif set_object_result == "dublicate":
+                    data_dub = {
+                        "uid": network_objects_from_mgmt["objects"][counter_network]["uid"],
+                        "new-name": f"dub%s_net_"%(str(counter_dublicate)) +str(network_objects_from_mgmt["objects"][counter_network]["subnet4"])+"/"+str(network_objects_from_mgmt["objects"][counter_network]["mask-length4"]),
+                        "comments": network_objects_from_mgmt["objects"][counter_network]["name"]
+                    }
+                    set_object_result = set_object(session_id, data_dub, "set-network", mgmt_url)
+                counter_dublicate = counter_dublicate + 1
+
+def rename_range_objects(session_id, range_objects_from_mgmt, excluded_objects_uid, mgmt_url):
+    ''' set network according to standard which you made '''
+    for counter_range in range(0, len(range_objects_from_mgmt["objects"])):
+        if range_objects_from_mgmt["objects"][counter_range]["uid"] in excluded_objects_uid:
+            continue
+        else:
+            set_object_result = ""
+            counter_dublicate = 1
+            while set_object_result != "unique":
+                try:
+                    check_version = range_objects_from_mgmt["objects"][counter_range]["ipv4-address-first"]
+                except:
+                    print("IPv6 not supported")
+                    break
+                data = {
+                    "uid": range_objects_from_mgmt["objects"][counter_range]["uid"],
+                    "new-name": "range_"+str(range_objects_from_mgmt["objects"][counter_range]["ipv4-address-first"])+"-"+str(range_objects_from_mgmt["objects"][counter_range]["ipv4-address-last"]),
+                    "comments": range_objects_from_mgmt["objects"][counter_range]["name"]
+                }
+                set_object_result = set_object(session_id, data, "set-address-range", mgmt_url)
+                if set_object_result == "unique":
+                    continue
+                elif set_object_result == "dublicate":
+                    data_dub = {
+                        "uid": range_objects_from_mgmt["objects"][counter_range]["uid"],
+                        "new-name": f"dub%s_range_"%(str(counter_dublicate)) + str(range_objects_from_mgmt["objects"][counter_range]["ipv4-address-first"])+"-"+str(range_objects_from_mgmt["objects"][counter_range]["ipv4-address-last"]),
+                        "comments": range_objects_from_mgmt["objects"][counter_range]["name"]
+                    }
+                    set_object_result = set_object(session_id, data_dub, "set-address-range", mgmt_url)
+                counter_dublicate = counter_dublicate + 1
+
+
+''' main program '''
+mgmt_url = "https://192.168.1.200/web_api/"
+''' host list should include only ipv4-address '''
+host_list = ["1.1.1.1"]
+''' objects uids which dont want to set '''
+excluded_objects_uid = ['9026f725-855b-4fb5-9108-e04c14ee9ed0','d9d199fa-a6c1-462b-9cac-e798bbcef585']
+try:
+    session_id = login(mgmt_url)
+    host_objects_from_mgmt = get_objects(session_id, "show-hosts")
+    network_objects_from_mgmt = get_objects(session_id, "show-networks")
+    range_objects_from_mgmt = get_objects(session_id, "show-address-ranges")
+    print(host_objects_from_mgmt)
+    print(network_objects_from_mgmt)
+    print(range_objects_from_mgmt)
+    rename_host_objects(session_id, host_objects_from_mgmt, excluded_objects_uid, mgmt_url)
+    rename_network_objects(session_id, network_objects_from_mgmt, excluded_objects_uid, mgmt_url)
+    rename_range_objects(session_id, range_objects_from_mgmt, excluded_objects_uid, mgmt_url)
+    publish(session_id)
+    logout(session_id)
+except:
+    discard(session_id)
+    logout(session_id)
+    print("Problem occurred. Changes discarded.")
