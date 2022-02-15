@@ -88,9 +88,7 @@ def delete_access_rulebase(session_id, req, access_rulebase):
                 "Content-Type": "application/json",
                 "X-chkp-sid": session_id
             }
-            delete_req = requests.post(url=mgmt_url + req, json=data, headers=header, verify=False)
-            print(delete_req.status_code)
-            print(delete_req.content)
+            requests.post(url=mgmt_url + req, json=data, headers=header, verify=False)
 
 ''' main program '''
 mgmt_url = "https://192.168.1.200/web_api/"
