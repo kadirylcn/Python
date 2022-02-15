@@ -97,7 +97,6 @@ mgmt_url = "https://192.168.1.200/web_api/"
 try:
     session_id = login(mgmt_url)
     access_rulebase = get_access_rulebase(session_id, "show-access-rulebase")
-    print(access_rulebase)
     value = input("1- Disable Rules\n"
                   "2- Remove Disable Rules\n")
     if value == "1":
