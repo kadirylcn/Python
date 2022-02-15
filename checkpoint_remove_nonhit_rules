@@ -1,0 +1,114 @@
+import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def login(mgmt_url):
+    ''' Login device and create Session ID'''
+    data = {
+        "user": "admin",
+        "password": "1qaz2wsx"
+    }
+    header = {}
+    login_req = requests.post(url=mgmt_url+"login", json=data, headers=header, verify=False)
+    print("Login request status code: " + str(login_req.status_code))
+    print("Session id: " + str(login_req.json()["sid"]))
+    return login_req.json()["sid"]
+
+def publish(session_id):
+    ''' Publish changes to the device'''
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Publish request status code: " + str(requests.post(url=mgmt_url+"publish", json=data, headers=header, verify=False).status_code))
+
+def discard(session_id):
+    ''' Discard changes '''
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Discard request status code: " + str(requests.post(url=mgmt_url+"discard", json=data, headers=header, verify=False).status_code))
+
+def logout(session_id):
+    ''' Logout from session'''
+    data = {}
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    print("Logout request status code: " + str(requests.post(url=mgmt_url+"logout", json=data, headers=header, verify=False).status_code))
+
+def get_access_rulebase(session_id, req):
+    ''' get access rulebase from management '''
+    data = {
+        "limit": 500,
+        "offset": 0,
+        "name" : "Network",
+        "details-level" : "standard",
+        "use-object-dictionary" : False,
+        "show-hits" : True
+    }
+    header = {
+        "Content-Type": "application/json",
+        "X-chkp-sid": session_id
+    }
+    return requests.post(url=mgmt_url + req, json=data, headers=header, verify=False).json()
+
+def set_access_rulebase(session_id, req, access_rulebase):
+    ''' disable non hit rules '''
+    for counter_rule in range(0, len(access_rulebase["rulebase"])):
+        if access_rulebase["rulebase"][counter_rule]["action"]["name"] == "Accept" and \
+                access_rulebase["rulebase"][counter_rule]["hits"]["value"] == 0 and \
+                access_rulebase["rulebase"][counter_rule]["meta-info"]["creation-time"]["posix"] < 1644700000000:
+            data = {
+                "uid" : access_rulebase["rulebase"][counter_rule]["uid"],
+                "layer" : "Network",
+                "enabled" : False
+            }
+            header = {
+                "Content-Type": "application/json",
+                "X-chkp-sid": session_id
+            }
+            disable_req = requests.post(url=mgmt_url + req, json=data, headers=header, verify=False)
+            print(disable_req.status_code)
+            print(disable_req.content)
+
+def delete_access_rulebase(session_id, req, access_rulebase):
+    ''' delete disabled rules '''
+    for counter_rule in range(0, len(access_rulebase["rulebase"])):
+        if access_rulebase["rulebase"][counter_rule]["enabled"] == False:
+            data = {
+                "uid" : access_rulebase["rulebase"][counter_rule]["uid"],
+                "layer" : "Network",
+            }
+            header = {
+                "Content-Type": "application/json",
+                "X-chkp-sid": session_id
+            }
+            delete_req = requests.post(url=mgmt_url + req, json=data, headers=header, verify=False)
+            print(delete_req.status_code)
+            print(delete_req.content)
+
+''' main program '''
+mgmt_url = "https://192.168.1.200/web_api/"
+try:
+    session_id = login(mgmt_url)
+    access_rulebase = get_access_rulebase(session_id, "show-access-rulebase")
+    print(access_rulebase)
+    value = input("1- Disable Rules\n"
+                  "2- Remove Disable Rules\n")
+    if value == "1":
+        set_access_rulebase(session_id, "set-access-rule", access_rulebase)
+    elif value == "2":
+        delete_access_rulebase(session_id, "delete-access-rule", access_rulebase)
+    else:
+        print("you must choose '1' or '2'.\n")
+    publish(session_id)
+    logout(session_id)
+except:
+    discard(session_id)
+    logout(session_id)
+    print("Problem occurred. Changes discarded.")
