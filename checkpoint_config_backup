@@ -1,0 +1,25 @@
+import paramiko
+import datetime
+
+def get_config():
+    ''' connect to device via ssh and get configuration '''
+    host = "192.168.1.200"
+    username = "admin"
+    password = "1qaz2wsx"
+    command = "show configuration"
+    client = paramiko.client.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(host, username=username, password=password)
+    stdin, stdout,stderr = client.exec_command(command)
+    config = stdout.read().decode()
+    client.close()
+    return config
+
+def write_config_to_txt_file(config):
+    ''' create txt file and put in config output '''
+    with open('cp-config-%s.txt'%(str(datetime.datetime.now()).split(' ')[0]), "a") as text_file:
+        text_file.write(config)
+
+''' main program '''
+config = get_config()
+write_config_to_txt_file(config)
