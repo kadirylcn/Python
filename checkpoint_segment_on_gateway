@@ -1,0 +1,54 @@
+import paramiko
+import ipaddress
+
+def get_segments(gateways):
+    ''' connect to device via ssh and get segments '''
+    username = "admin"
+    password = "1qaz2wsx"
+    command = "fw getifs"
+    client = paramiko.client.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(gateways, username=username, password=password)
+    stdin, stdout, stderr = client.exec_command(command)
+    segments = ((stdout.read().decode()).split("\n"))
+    segments.remove('')
+    client.close()
+    return segments
+
+def convert_subnet_to_subnetmask(segments):
+    ''' convert subnet parameter to subnet mask '''
+    new_segment_list = []
+    for counter_segment in range(0, len(segments)):
+        network_address = str(segments[counter_segment].split(" ")[2])+"/"+str((segments[counter_segment].split(" ")[3]))
+        keep = ipaddress.ip_network(network_address, strict=False)
+        new_segment_list.append(keep)
+    return new_segment_list
+
+def check_host(host, segments_with_subnetmask):
+    ''' check host's segment on gateway or not '''
+    for counter_segment in range(0, len(segments_with_subnetmask)):
+        if (host in segments_with_subnetmask[counter_segment]) == True:
+            return segments_with_subnetmask[counter_segment]
+    return False
+
+''' main program '''
+gateways = ["192.168.1.201","192.168.10.202","192.168.1.201"]
+hosts = ["192.1.100.4","192.168.100.4","10.10.10.10"]
+for counter_gateway in range(0, len(gateways)):
+    print("------------------------------------------------------------")
+    try:
+        segments = get_segments(gateways[counter_gateway])
+    except:
+        print("%s gateway connection error"%str(gateways[counter_gateway]))
+        print("------------------------------------------------------------\n")
+        continue
+    print("Segments on %s gateway: "%gateways[counter_gateway] +str(segments))
+    segments_with_subnetmask = convert_subnet_to_subnetmask(segments)
+    for counter_host in range(0, len(hosts)):
+        host = ipaddress.ip_address(hosts[counter_host])
+        result = check_host(host, segments_with_subnetmask)
+        if result == False:
+            print("%s host's network not on %s gateway" % (hosts[counter_host], gateways[counter_gateway]))
+        else:
+            print("%s host's %s network on %s gateway" % (hosts[counter_host], result, gateways[counter_gateway]))
+    print("------------------------------------------------------------\n")
