@@ -13,11 +13,13 @@ def get_outputs(gateway, commands):
         try:
             client.connect(gateway, username=username, password=password)
         except:
-            command_output = command_output + "gateway %s connection problem\n"%gateway
+            command_output = command_output + "------------------------------\n" \
+                                              "gateway %s connection problem\n"%gateway
             counter_commands = counter_commands + 1
             continue
         stdin, stdout, stderr = client.exec_command(commands[counter_commands])
-        command_output = command_output + "gateway= %s\ncommand= %s\n\noutput\n%s\n"%(gateway, commands[counter_commands],stdout.read().decode())
+        command_output = command_output + "------------------------------\n" \
+                                          "gateway= %s\ncommand= %s\noutput\n%s\n"%(gateway, commands[counter_commands],stdout.read().decode())
         counter_commands = counter_commands+1
     return command_output
 
