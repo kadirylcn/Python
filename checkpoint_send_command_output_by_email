@@ -29,7 +29,7 @@ def send_email(outputs):
     mail = smtplib.SMTP("smtp.gmail.com", 587)
     mail.ehlo()
     mail.starttls()
-    mail.login("p.test.mail91@gmail.com", "Pass1234!")
+    mail.login("p.test.mail91@gmail.com", "1qaz2wsx")
     mail.sendmail("p.test.mail91@gmail.com", "kadir.ylcn1@gmail.com", outputs)
 
 ''' main program '''
