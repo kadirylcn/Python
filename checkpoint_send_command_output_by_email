@@ -1,0 +1,42 @@
+import paramiko
+import smtplib
+
+def get_outputs(gateway, commands):
+    ''' ssh to device and get output of commands  '''
+    command_output = ""
+    counter_commands = 0
+    while counter_commands < len(commands):
+        username = "admin"
+        password = "1qaz2wsx"
+        client = paramiko.client.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            client.connect(gateway, username=username, password=password)
+        except:
+            command_output = command_output + "gateway %s connection problem\n"%gateway
+            counter_commands = counter_commands + 1
+            continue
+        stdin, stdout, stderr = client.exec_command(commands[counter_commands])
+        command_output = command_output + "gateway= %s\ncommand= %s\n\noutput\n%s\n"%(gateway, commands[counter_commands],stdout.read().decode())
+        counter_commands = counter_commands+1
+    return command_output
+
+def send_email(outputs):
+    ''' send email to reciepent. Replace ":" to "=" because of smtplib parsing problem'''
+    outputs = "Subject: Checkpoint commands\n" + outputs.replace(":","=")
+    mail = smtplib.SMTP("smtp.gmail.com", 587)
+    mail.ehlo()
+    mail.starttls()
+    mail.login("p.test.mail91@gmail.com", "Pass1234!")
+    mail.sendmail("p.test.mail91@gmail.com", "kadir.ylcn1@gmail.com", outputs)
+
+''' main program '''
+commands = ["clish -c 'show asset all'", "clish -c 'show interfaces'"]
+gateways = ["192.168.1.200","192.168.1.201"]
+counter_gateways = 0
+keep_outputs = ""
+while counter_gateways < len(gateways):
+    outputs = get_outputs(gateways[counter_gateways], commands)
+    keep_outputs = keep_outputs + outputs
+    counter_gateways = counter_gateways + 1
+send_email(keep_outputs)
